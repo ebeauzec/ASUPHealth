@@ -249,7 +249,7 @@ class AppController {
       this.processASUPData(fileMap);
     } catch (err) {
       console.error(err);
-      alert("Error parsing file bundle. Please ensure it is a valid zip containing AutoSupport telemetry files, or a plaintext log.");
+      alert(`Error parsing file bundle:\n${err.message || err}\n\nStack:\n${err.stack || ''}`);
     } finally {
       dropZoneText.innerText = "Upload ASUP bundle";
     }
