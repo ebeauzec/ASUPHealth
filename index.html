@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetApp AutoSupport (ASUP) Health Analyzer & Visualizer</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- CDNs for JSZip (unzipping) and Chart.js (storage charts) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-container">
+          <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          <span class="logo-text">ANTIGRAVITY<span class="logo-accent">.ASUP</span></span>
+        </div>
+        <div class="system-status-indicator" id="sidebar-system-status">
+          <span class="status-dot warning"></span>
+          <span class="status-label">No System Loaded</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <button class="nav-btn active" data-tab="dashboard">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+              <span>Dashboard</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="action-plan">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              <span>Action Plan</span>
+              <span class="badge badge-danger" id="action-plan-badge" style="display: none;">0</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="topology">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"></circle><circle cx="5" cy="19" r="3"></circle><circle cx="19" cy="19" r="3"></circle><line x1="6.7" y1="16.3" x2="10.3" y2="7.7"></line><line x1="17.3" y1="16.3" x2="13.7" y2="7.7"></line></svg>
+              <span>Topology & Diagram</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="storage">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+              <span>Storage Aggregates</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="network">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line><line x1="20" y1="6" x2="20.01" y2="6"></line><line x1="20" y1="18" x2="20.01" y2="18"></line></svg>
+              <span>Network & Ports</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="hardware">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+              <span>Hardware & Shelves</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="licenses">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+              <span>Licenses & Protocols</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-btn" data-tab="log-analyzer">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.05 18.05L22 22M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z"></path></svg>
+              <span>Log Analyzer</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="theme-toggle-btn" class="theme-toggle">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <span>Light Mode</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top header bar with file uploader and quick stats -->
+      <header class="top-header">
+        <div class="header-left">
+          <h1>NetApp ASUP Analyzer</h1>
+          <p class="subtitle">Upload or drop your AutoSupport logs (.zip, .tgz, .txt) for instant visualization and health audit.</p>
+        </div>
+
+        <div class="header-right">
+          <!-- File Drop Zone -->
+          <div class="file-upload-zone" id="drop-zone">
+            <input type="file" id="file-input" class="file-input" multiple accept=".zip,.tgz,.tar.gz,.txt">
+            <div class="upload-prompt">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              <span>Upload ASUP bundle</span>
+            </div>
+          </div>
+          <!-- Demo Data Button -->
+          <button id="load-demo-btn" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Load Demo System</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Views (Tabs) -->
+      <div class="view-viewport">
+
+        <!-- 1. DASHBOARD VIEW -->
+        <section id="view-dashboard" class="tab-view active">
+          <!-- Welcome screen when no data is loaded -->
+          <div class="welcome-screen" id="welcome-container">
+            <div class="welcome-card">
+              <div class="welcome-icon">
+                <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+              </div>
+              <h2>Ready to Analyze Your NetApp Storage</h2>
+              <p>Drag and drop a zipped AutoSupport bundle, folder extracts, or individual telemetry files. You can also view a mock scenario by loading our comprehensive FAS8200 HA pair demo dataset.</p>
+              <div class="welcome-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">
+                  Browse Files
+                </button>
+                <button class="btn btn-primary" id="welcome-demo-btn">
+                  Load Demo Data
+                </button>
+              </div>
+              <div class="supported-files-list">
+                <h4>Supported files include:</h4>
+                <ul>
+                  <li><code>sysconfig-a</code> / <code>sysconfig-r</code></li>
+                  <li><code>df</code> / <code>network interface</code></li>
+                  <li><code>storage shelf show</code> / <code>messages</code></li>
+                  <li>Combined ASUP text dumps</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Dashboard Grid -->
+          <div class="dashboard-grid" id="dashboard-content" style="display: none;">
+            <!-- Column 1: Health Gauge & Summary -->
+            <div class="card health-card">
+              <h3>System Health Index</h3>
+              <div class="health-gauge-container">
+                <svg class="gauge-svg" viewBox="0 0 100 100">
+                  <circle class="gauge-bg" cx="50" cy="50" r="40" />
+                  <circle class="gauge-fill" id="health-gauge-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2" />
+                  <text class="gauge-value" id="health-score-val" x="50" y="55">0</text>
+                  <text class="gauge-percent" x="68" y="44">%</text>
+                </svg>
+              </div>
+              <div class="health-status-text" id="health-status-text">Determining status...</div>
+              <p class="health-summary" id="health-summary-text"></p>
+            </div>
+
+            <!-- Column 2: System Metadata -->
+            <div class="card sysinfo-card">
+              <h3>System Overview</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Chassis Model</span>
+                  <span class="info-value" id="sys-model">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ONTAP Version</span>
+                  <span class="info-value" id="sys-version">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Cluster Nodes</span>
+                  <span class="info-value" id="sys-nodes">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">HA State</span>
+                  <span class="info-value" id="sys-ha-state">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">System IDs</span>
+                  <span class="info-value font-mono" id="sys-ids">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Serial Numbers</span>
+                  <span class="info-value font-mono" id="sys-serials">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 3: Telemetry File Status -->
+            <div class="card files-card">
+              <h3>Parsed Telemetry Sections</h3>
+              <ul class="file-badges-list" id="parsed-sections-list">
+                <!-- Badges dynamically inserted -->
+              </ul>
+            </div>
+
+            <!-- Row 2: Stats cards -->
+            <div class="stats-row full-width">
+              <div class="stat-card">
+                <span class="stat-number" id="stat-aggregates">0</span>
+                <span class="stat-label">Aggregates</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="stat-volumes">0</span>
+                <span class="stat-label">Volumes</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="stat-disks">0</span>
+                <span class="stat-label">Disks</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="stat-shelves">0</span>
+                <span class="stat-label">Shelves</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="stat-networks">0</span>
+                <span class="stat-label">Network Ports</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="stat-licenses">0</span>
+                <span class="stat-label">Active Licenses</span>
+              </div>
+            </div>
+
+            <!-- Row 3: Alert summaries -->
+            <div class="card alert-summary-card full-width">
+              <h3>Identified Issues & Severity Breakdown</h3>
+              <div class="alert-bar-chart">
+                <div class="alert-segment segment-critical" id="alert-seg-critical" style="width: 0%"></div>
+                <div class="alert-segment segment-warning" id="alert-seg-warning" style="width: 0%"></div>
+                <div class="alert-segment segment-info" id="alert-seg-info" style="width: 0%"></div>
+              </div>
+              <div class="alert-legend">
+                <div class="legend-item" data-filter="CRITICAL">
+                  <span class="badge-dot badge-red"></span>
+                  <span class="legend-label">Critical</span>
+                  <span class="legend-count" id="count-critical">0</span>
+                </div>
+                <div class="legend-item" data-filter="WARNING">
+                  <span class="badge-dot badge-yellow"></span>
+                  <span class="legend-label">Warning</span>
+                  <span class="legend-count" id="count-warning">0</span>
+                </div>
+                <div class="legend-item" data-filter="INFO">
+                  <span class="badge-dot badge-blue"></span>
+                  <span class="legend-label">Information / CVEs</span>
+                  <span class="legend-count" id="count-info">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 4: Top critical issues list -->
+            <div class="card top-issues-card full-width">
+              <div class="card-header-flex">
+                <h3>Top Critical Issues</h3>
+                <button class="btn btn-text btn-small" onclick="window.appController.switchTab('action-plan')">View Action Plan &rarr;</button>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Category</th>
+                    <th>Issue Detected</th>
+                    <th>Impact</th>
+                    <th>Quick Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody id="top-issues-list">
+                  <tr><td colspan="5" class="text-center">No issues detected.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 2. ACTION PLAN & REMEDIATION VIEW -->
+        <section id="view-action-plan" class="tab-view">
+          <div class="action-plan-container">
+            <div class="action-plan-header">
+              <h2>Action Plan & Remediation</h2>
+              <p>Prioritized action list to fix system issues according to NetApp Best Practices. Run the CLI commands directly on your ONTAP controllers to resolve.</p>
+            </div>
+            
+            <div class="action-plan-split">
+              <!-- Left side: Task Checklist -->
+              <div class="action-checklist-column">
+                <div class="card">
+                  <div class="card-header-flex">
+                    <h3>Remediation Checklist</h3>
+                    <span class="checklist-progress" id="checklist-progress-text">0 / 0 Completed</span>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-bar-fill" id="checklist-progress-bar" style="width: 0%"></div>
+                  </div>
+                  <div class="checklist-items-container" id="remediation-checklist-list">
+                    <!-- Checkbox items injected -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right side: Detailed remediation documentation for selected issue -->
+              <div class="action-details-column">
+                <div class="card issue-detail-card sticky-card" id="issue-detail-panel">
+                  <div class="placeholder-detail-panel">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <p>Select a checklist item to view detailed remediation steps, impact assessment, and copy-pasteable ONTAP CLI commands.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 3. TOPOLOGY VIEW -->
+        <section id="view-topology" class="tab-view">
+          <div class="topology-container">
+            <div class="topology-toolbar">
+              <h2>System Topology</h2>
+              <div class="btn-group">
+                <button class="btn btn-secondary active" id="topology-btn-physical">Physical Topology</button>
+                <button class="btn btn-secondary" id="topology-btn-logical">Logical Networking</button>
+              </div>
+            </div>
+
+            <!-- View Canvas -->
+            <div class="card topology-canvas-card">
+              <!-- Physical Topology -->
+              <div id="topology-physical-view" class="topology-pane active">
+                <div class="topology-info-bar">
+                  <div class="info-bar-item">
+                    <span class="legend-color-box healthy"></span>
+                    <span>Healthy Disk / Port</span>
+                  </div>
+                  <div class="info-bar-item">
+                    <span class="legend-color-box spare"></span>
+                    <span>Spare Disk</span>
+                  </div>
+                  <div class="info-bar-item">
+                    <span class="legend-color-box broken"></span>
+                    <span>Failed Disk / Link Down</span>
+                  </div>
+                  <div class="info-bar-item">
+                    <span class="legend-color-box warning"></span>
+                    <span>Warning / Mismatch</span>
+                  </div>
+                </div>
+                <div class="canvas-svg-container" id="physical-topology-svg">
+                  <!-- SVG injected here -->
+                </div>
+              </div>
+
+              <!-- Logical Topology -->
+              <div id="topology-logical-view" class="topology-pane">
+                <div class="topology-info-bar">
+                  <div class="info-bar-item"><span class="legend-color-box nfs"></span><span>NFS LIF</span></div>
+                  <div class="info-bar-item"><span class="legend-color-box cifs"></span><span>CIFS/SMB LIF</span></div>
+                  <div class="info-bar-item"><span class="legend-color-box iscsi"></span><span>iSCSI LIF</span></div>
+                  <div class="info-bar-item"><span class="legend-color-box mgmt"></span><span>Management LIF</span></div>
+                  <div class="info-bar-item"><span class="legend-color-box status-down"></span><span>Interface Down</span></div>
+                </div>
+                <div class="canvas-svg-container" id="logical-topology-svg">
+                  <!-- SVG injected here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Tooltip details overlay -->
+            <div class="card topology-details-card" id="topology-item-details" style="display: none;">
+              <div class="card-header-flex">
+                <h4 id="topo-detail-title">Device Details</h4>
+                <button class="btn btn-text btn-small" onclick="document.getElementById('topology-item-details').style.display='none'">Close</button>
+              </div>
+              <div id="topo-detail-content">Select an item on the diagram to see specifications.</div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 4. STORAGE VIEW -->
+        <section id="view-storage" class="tab-view">
+          <div class="storage-container">
+            <h2>Storage Aggregates & Volume Hierarchy</h2>
+            
+            <!-- Storage visual charts -->
+            <div class="storage-charts-row">
+              <div class="card storage-chart-card">
+                <h3>Aggregate Capacities</h3>
+                <div class="chart-wrapper">
+                  <canvas id="aggregates-chart"></canvas>
+                </div>
+              </div>
+              <div class="card storage-chart-card">
+                <h3>Volume Capacities</h3>
+                <div class="chart-wrapper">
+                  <canvas id="volumes-chart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Aggregates details -->
+            <div class="card storage-aggregates-card">
+              <h3>Storage Aggregates (sysconfig -r)</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Aggregate Name</th>
+                    <th>Owner Node</th>
+                    <th>RAID Type</th>
+                    <th>State</th>
+                    <th>Total Size</th>
+                    <th>Used Size</th>
+                    <th>Free Size</th>
+                    <th>% Used</th>
+                    <th>Disk Count</th>
+                    <th>RAID Status</th>
+                  </tr>
+                </thead>
+                <tbody id="storage-aggregates-table-body">
+                  <!-- Injected -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Volume details -->
+            <div class="card storage-volumes-card">
+              <h3>Logical Volumes (df -h)</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Volume Name</th>
+                    <th>Parent Aggregate</th>
+                    <th>Node</th>
+                    <th>Total Size</th>
+                    <th>Used Size</th>
+                    <th>Available Size</th>
+                    <th>% Used</th>
+                    <th>Thin Provisioned</th>
+                    <th>Snapshot Reserve</th>
+                  </tr>
+                </thead>
+                <tbody id="storage-volumes-table-body">
+                  <!-- Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 5. NETWORK VIEW -->
+        <section id="view-network" class="tab-view">
+          <div class="network-container">
+            <h2>Network Infrastructure</h2>
+
+            <!-- Logical Interfaces (LIFs) -->
+            <div class="card network-lifs-card">
+              <h3>Logical Interfaces (LIFs)</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>LIF Name</th>
+                    <th>Node</th>
+                    <th>IP Address / Subnet</th>
+                    <th>Home Port</th>
+                    <th>Current Port</th>
+                    <th>Is Home?</th>
+                    <th>Status (Admin/Oper)</th>
+                    <th>Firewall Policy</th>
+                    <th>Failover Policy</th>
+                  </tr>
+                </thead>
+                <tbody id="network-lifs-table-body">
+                  <!-- Injected -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Interface Groups (ifgrps) and Ports -->
+            <div class="network-split-row">
+              <div class="card network-ports-card">
+                <h3>Physical Ports</h3>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Port</th>
+                      <th>Node</th>
+                      <th>Operational Link</th>
+                      <th>Speed</th>
+                      <th>Duplex</th>
+                      <th>MTU</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody id="network-ports-table-body">
+                    <!-- Injected -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="card network-ifgrps-card">
+                <h3>Interface Groups (LACP / Link Aggregation)</h3>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Group Name</th>
+                      <th>Node</th>
+                      <th>Distribution Mode</th>
+                      <th>Active Members</th>
+                      <th>Failed Members</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="network-ifgrps-table-body">
+                    <!-- Injected -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 6. HARDWARE & SHELVES VIEW -->
+        <section id="view-hardware" class="tab-view">
+          <div class="hardware-container">
+            <h2>Hardware Components & Disk Shelves</h2>
+
+            <div class="hardware-split-row">
+              <!-- Environmental Health Sensors -->
+              <div class="card hardware-sensors-card">
+                <h3>Chassis Environmental Status</h3>
+                <div class="sensor-grid" id="hardware-sensors-grid">
+                  <!-- Injected -->
+                </div>
+              </div>
+
+              <!-- Controller Hardware details -->
+              <div class="card hardware-controller-card">
+                <h3>Motherboard & PCI Expansion Cards</h3>
+                <div class="info-grid" id="hardware-specs-grid">
+                  <!-- Injected -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Disk Shelves Hardware -->
+            <div class="card hardware-shelves-card">
+              <h3>SAS Disk Shelves (storage shelf show)</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Shelf ID</th>
+                    <th>Shelf Model</th>
+                    <th>Firmware (IOM/IOM12)</th>
+                    <th>SAS Paths (Node A / Node B)</th>
+                    <th>Disk Count</th>
+                    <th>Power Supplies</th>
+                    <th>Fans</th>
+                    <th>Chassis Temp</th>
+                    <th>Serial Number</th>
+                  </tr>
+                </thead>
+                <tbody id="hardware-shelves-table-body">
+                  <!-- Injected -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Disks inventory -->
+            <div class="card hardware-disks-card">
+              <h3>Disks Inventory & Firmware Audit</h3>
+              <div class="disks-filters">
+                <label>Filter state:</label>
+                <select id="disk-state-filter" class="form-control" style="width: 150px; display: inline-block; margin-right: 15px;">
+                  <option value="all">All States</option>
+                  <option value="data">Data Disks</option>
+                  <option value="spare">Spare Disks</option>
+                  <option value="failed">Failed / Broken</option>
+                  <option value="firmware-mismatch">Firmware Mismatch</option>
+                </select>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Disk ID</th>
+                    <th>Shelf / Slot</th>
+                    <th>Status</th>
+                    <th>Capacity</th>
+                    <th>Disk Model</th>
+                    <th>RPM / Speed</th>
+                    <th>Disk Serial</th>
+                    <th>Firmware Version</th>
+                    <th>Aggregate Assigned</th>
+                  </tr>
+                </thead>
+                <tbody id="hardware-disks-table-body">
+                  <!-- Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 7. LICENSES & PROTOCOLS VIEW -->
+        <section id="view-licenses" class="tab-view">
+          <div class="licenses-container">
+            <h2>Licenses & Protocol Status</h2>
+
+            <div class="licenses-split-row">
+              <!-- Licenses list -->
+              <div class="card licenses-list-card">
+                <h3>Feature Licenses</h3>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Licensed Feature</th>
+                      <th>Serial Number</th>
+                      <th>License Key / Type</th>
+                      <th>Expiry</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="licenses-table-body">
+                    <!-- Injected -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Protocols configured vs active -->
+              <div class="card protocols-card">
+                <h3>ONTAP Active Network Protocols</h3>
+                <div class="protocols-health-list" id="protocols-health-list">
+                  <!-- Dynamic protocols cards -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 8. LOG ANALYZER VIEW -->
+        <section id="view-log-analyzer" class="tab-view">
+          <div class="log-analyzer-container">
+            <h2>Raw Log Event Analyzer</h2>
+            <p>Searches and filters errors/warnings inside the parsed <code>messages</code> file or syslog events from the AutoSupport log.</p>
+
+            <div class="card log-controls-card">
+              <div class="log-controls-row">
+                <input type="text" id="log-search-input" class="form-control" placeholder="Search logs (e.g. disc, fail, warning, scsi)...">
+                
+                <select id="log-severity-filter" class="form-control">
+                  <option value="all">All Severities</option>
+                  <option value="alert-panic">Alert / Panic / Critical</option>
+                  <option value="error">Error</option>
+                  <option value="warning" selected>Warning & Above</option>
+                  <option value="info">Info / Notice / Debug</option>
+                </select>
+
+                <select id="log-component-filter" class="form-control">
+                  <option value="all">All Components</option>
+                  <option value="storage">Storage & RAID</option>
+                  <option value="network">Network / NIC / LIF</option>
+                  <option value="hardware">Hardware / Fans / PSUs</option>
+                  <option value="clustering">Clustering / HA / FO</option>
+                </select>
+
+                <button class="btn btn-secondary" id="log-search-clear-btn">Reset</button>
+              </div>
+            </div>
+
+            <!-- Log table output -->
+            <div class="card log-events-card">
+              <div class="card-header-flex">
+                <h3 id="log-results-count">Showing 0 Log Events</h3>
+              </div>
+              <div class="log-viewer-pane" id="log-viewer-content">
+                <div class="log-viewer-placeholder">
+                  Select filters or load AutoSupport data to populate logs.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- JavaScript Script files -->
+  <script src="js/demo-data.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/analyzer.js"></script>
+  <script src="js/topology.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
