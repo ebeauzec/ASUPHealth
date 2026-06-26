@@ -191,6 +191,14 @@ class AppController {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const lowerName = file.name.toLowerCase();
+
+        // Check for unsupported binary archives
+        if (lowerName.endsWith('.7z') || lowerName.endsWith('.tgz') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tar') || lowerName.endsWith('.gz')) {
+          alert(`Unsupported Archive Format: "${file.name}"\n\nClient-side JavaScript cannot directly decompress binary formats like .7z, .tgz, or .tar.gz.\n\nTo analyze this system, please either:\n1. Decompress the archive on your local computer, select the extracted telemetry files (e.g. sysconfig-a, sysconfig-r, df, messages), and upload them together.\n2. Re-compress the extracted files into a standard .zip archive and upload that .zip file.`);
+          dropZoneText.innerText = "Upload ASUP bundle";
+          return;
+        }
         
         // 1. ZIPPED ASUP BUNDLE
         if (file.name.endsWith('.zip')) {
@@ -243,6 +251,11 @@ class AppController {
     });
 
     this.updateUI();
+
+    // Check if the parser failed to identify any sections
+    if (model.parsedSections.length === 0) {
+      alert("Warning: No standard AutoSupport telemetry sections (such as sysconfig-a, sysconfig-r, df, messages, network-interface) could be identified in the uploaded file.\n\nPlease verify that the file contains valid NetApp command outputs or log files, or try extracting your archive and uploading the individual telemetry files together.");
+    }
   }
 
   /**
