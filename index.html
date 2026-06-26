@@ -12,6 +12,37 @@
   <!-- Local libraries for completely offline capability -->
   <script src="js/jszip.min.js"></script>
   <script src="js/chart.min.js"></script>
+  <!-- Global Runtime Debugger for troubleshooting local client-side faults -->
+  <script>
+    window.addEventListener('error', function(e) {
+      showErrorBanner("Runtime Error: " + e.message + " (at " + e.filename + ":" + e.lineno + ")");
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      showErrorBanner("Promise Rejected: " + (e.reason ? (e.reason.message || e.reason) : e));
+    });
+    function showErrorBanner(msg) {
+      let banner = document.getElementById('debug-error-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'debug-error-banner';
+        banner.style.cssText = 'position:fixed; top:10px; right:10px; left:10px; padding:15px 20px; background-color:#ef4444; color:#fff; font-family:monospace; font-size:12px; z-index:99999; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5); display:flex; justify-content:space-between; align-items:center;';
+        
+        const txt = document.createElement('span');
+        txt.id = 'debug-error-text';
+        banner.appendChild(txt);
+        
+        const btn = document.createElement('button');
+        btn.innerText = 'Dismiss';
+        btn.style.cssText = 'background:none; border:1px solid #fff; color:#fff; padding:4px 10px; cursor:pointer; border-radius:4px; margin-left:15px; font-weight:bold;';
+        btn.onclick = function() { banner.style.display = 'none'; };
+        banner.appendChild(btn);
+        
+        document.body.appendChild(banner);
+      }
+      document.getElementById('debug-error-text').innerText = msg;
+      banner.style.display = 'flex';
+    }
+  </script>
 </head>
 <body>
   <div class="app-container">
