@@ -5,7 +5,7 @@
 /* Custom properties & Tokens */
 :root {
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', Consolas, "SF Mono", "Liberation Mono", Menlo, Courier, monospace;
 
   /* Theme: Dark Mode (Default) */
   --bg-primary: #0a0e1a;
