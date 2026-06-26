@@ -193,11 +193,32 @@ class AppController {
         const file = files[i];
         const lowerName = file.name.toLowerCase();
 
-        // Check for unsupported binary archives
-        if (lowerName.endsWith('.7z') || lowerName.endsWith('.tgz') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tar') || lowerName.endsWith('.gz')) {
-          alert(`Unsupported Archive Format: "${file.name}"\n\nClient-side JavaScript cannot directly decompress binary formats like .7z, .tgz, or .tar.gz.\n\nTo analyze this system, please either:\n1. Decompress the archive on your local computer, select the extracted telemetry files (e.g. sysconfig-a, sysconfig-r, df, messages), and upload them together.\n2. Re-compress the extracted files into a standard .zip archive and upload that .zip file.`);
-          dropZoneText.innerText = "Upload ASUP bundle";
-          return;
+        const is7z = lowerName.endsWith('.7z') || lowerName.endsWith('.tgz') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tar') || lowerName.endsWith('.gz');
+
+        if (is7z) {
+          if (window.location.protocol === 'file:') {
+            alert(`Unsupported in Local File Mode: "${file.name}"\n\nTo decompress .7z or .tar.gz archives in your browser, WebAssembly and Web Workers are required.\n\nBrowsers block Web Workers on the local file:// protocol for security reasons. To use the .7z file upload feature, please open the application via the local server running in your background:\n\nhttp://localhost:8000\n\nAlternatively, you can extract the files locally on your computer and upload them directly.`);
+            dropZoneText.innerText = "Upload ASUP bundle";
+            return;
+          }
+
+          // We are running on http://localhost:8000, we can use libarchive.js!
+          try {
+            const { Archive } = await import('./libarchive.js');
+            Archive.init({
+              workerUrl: './js/worker-bundle.js'
+            });
+            const archive = await Archive.open(file);
+            const filesObj = await archive.extractFiles();
+            await this.flattenFilesObject(filesObj, fileMap);
+            await archive.close();
+            continue;
+          } catch (archiveErr) {
+            console.error(archiveErr);
+            alert(`Failed to extract "${file.name}": ${archiveErr.message}\n\nPlease ensure the archive is not corrupted.`);
+            dropZoneText.innerText = "Upload ASUP bundle";
+            return;
+          }
         }
         
         // 1. ZIPPED ASUP BUNDLE
@@ -231,6 +252,25 @@ class AppController {
       alert("Error parsing file bundle. Please ensure it is a valid zip containing AutoSupport telemetry files, or a plaintext log.");
     } finally {
       dropZoneText.innerText = "Upload ASUP bundle";
+    }
+  }
+
+  /**
+   * Recursively flattens nested directory object of Files from libarchive.js
+   */
+  async flattenFilesObject(obj, fileMap, currentPath = "") {
+    for (let key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val instanceof File || val instanceof Blob || (val && typeof val.text === 'function')) {
+        try {
+          const text = await val.text();
+          fileMap[key] = text;
+        } catch (readErr) {
+          console.error(`Failed to read file ${key}:`, readErr);
+        }
+      } else if (typeof val === 'object' && val !== null) {
+        await this.flattenFilesObject(val, fileMap, currentPath ? `${currentPath}/${key}` : key);
+      }
     }
   }
 
