@@ -17,19 +17,70 @@ window.asupParser = {
       sections = this.splitCombinedText(data);
     } else if (typeof data === 'object') {
       // It's a map of file names to content (e.g., from ZIP extraction)
-      sections = data;
+      sections = { ...data };
+
+      // 1. Check if any file in the object is actually a combined text dump
+      // and split it so we pull sub-sections.
+      for (let filename of Object.keys(data)) {
+        const content = data[filename];
+        if (typeof content === 'string') {
+          // If the file contents has common header separators, split it.
+          if (content.includes('===') || content.includes('---') || content.includes('INPUT-FILE:') || content.includes('***')) {
+            const subSections = this.splitCombinedText(content);
+            if (Object.keys(subSections).length > 1 || (Object.keys(subSections).length === 1 && !subSections["body.txt"])) {
+              Object.assign(sections, subSections);
+            }
+          }
+        }
+      }
+
+      // 2. Special case: If user uploaded exactly 1 file (which is a single command output like "sysconfig-a.txt" or generic "autosupport.txt")
+      // and it didn't get split into multiple sub-sections, map it to the right target section.
+      if (Object.keys(data).length === 1) {
+        const filename = Object.keys(data)[0];
+        const content = data[filename];
+        
+        // If sections only contains the default body or filename, try to assign it.
+        const sectionKeys = Object.keys(sections);
+        if (sectionKeys.length <= 1) {
+          const lowerName = filename.toLowerCase();
+          const cleanContent = content.trim();
+
+          if (lowerName.includes('sysconfig-a') || lowerName.includes('sysconfig_a') || cleanContent.includes('System Model') || cleanContent.includes('System Serial Number')) {
+            sections['sysconfig-a'] = content;
+          } else if (lowerName.includes('sysconfig-r') || lowerName.includes('sysconfig_r') || cleanContent.includes('RAID Group') || cleanContent.includes('Spare Disks')) {
+            sections['sysconfig-r'] = content;
+          } else if (lowerName.includes('df') || cleanContent.includes('Mounted on') || cleanContent.includes('Filesystem')) {
+            sections['df'] = content;
+          } else if (lowerName.includes('network-interface') || lowerName.includes('network_interface') || lowerName.includes('lif') || cleanContent.includes('Logical Interface')) {
+            sections['network-interface'] = content;
+          } else if (lowerName.includes('ifconfig')) {
+            sections['ifconfig'] = content;
+          } else if (lowerName.includes('shelf') || lowerName.includes('storage shelf') || cleanContent.includes('Shelf Model')) {
+            sections['storage-shelf'] = content;
+          } else if (lowerName.includes('license') || cleanContent.includes('Feature') && cleanContent.includes('License Key')) {
+            sections['license'] = content;
+          } else if (lowerName.includes('messages') || lowerName.includes('syslog') || cleanContent.includes('wafl.') || cleanContent.includes('disk.')) {
+            sections['messages'] = content;
+          }
+        }
+      }
     }
 
-    // Normalizing keys to standard sections
+    // Normalizing keys to standard sections using Alphanumeric comparison
+    // E.g. "sysconfig -a", "sysconfig_a", "sysconfig-a" all normalize to "sysconfiga"
+    const normalizeKey = k => k.toLowerCase().replace(/[^a-z0-9]/g, '');
+
     const getSectionContent = (possibleKeys) => {
-      for (let key of possibleKeys) {
-        // Try exact match or match containing the key
-        const foundKey = Object.keys(sections).find(k => 
-          k.toLowerCase() === key.toLowerCase() || 
-          k.toLowerCase().includes(key.toLowerCase())
-        );
-        if (foundKey && sections[foundKey]) {
-          return sections[foundKey];
+      const normalizedPossibles = possibleKeys.map(normalizeKey);
+      
+      for (let key of Object.keys(sections)) {
+        const normalizedKey = normalizeKey(key);
+        // Check if normalized key matches or contains any of the possibles
+        for (let target of normalizedPossibles) {
+          if (normalizedKey === target || normalizedKey.includes(target)) {
+            return sections[key];
+          }
         }
       }
       return "";
@@ -99,11 +150,13 @@ window.asupParser = {
     let currentContent = [];
 
     const sectionHeaderRegexes = [
-      /^(?:={3,})\s+SECTION:\s+([A-Za-z0-9_\-\.]+)\s+(?:={3,})/i,
-      /^(?:={3,})\s+([A-Za-z0-9_\-\.\s]+)\s+(?:={3,})/i,
-      /^INPUT-FILE:\s*([A-Za-z0-9_\-\.]+)/i,
-      /^FILE:\s*([A-Za-z0-9_\-\.]+)/i,
-      /^\*\*\*\s+([A-Za-z0-9_\-\.]+)\s+\*\*\*/i
+      /^(?:={3,})\s+SECTION:\s+([A-Za-z0-9_\-\.\s\(\)]+)\s+(?:={3,})/i,
+      /^(?:={3,})\s+([A-Za-z0-9_\-\.\s\(\)]+)\s+(?:={3,})/i,
+      /^(?:\-{3,})\s+([A-Za-z0-9_\-\.\s\(\)]+)\s+(?:\-{3,})/i,
+      /^(?:\*{3,})\s+([A-Za-z0-9_\-\.\s\(\)]+)\s+(?:\*{3,})/i,
+      /^INPUT-FILE:\s*([A-Za-z0-9_\-\.\s\(\)]+)/i,
+      /^FILE:\s*([A-Za-z0-9_\-\.\s\(\)]+)/i,
+      /^\*\*\*\s+([A-Za-z0-9_\-\.\s\(\)]+)\s+\*\*\*/i
     ];
 
     for (let line of lines) {
