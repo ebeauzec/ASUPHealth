@@ -204,7 +204,7 @@ class AppController {
 
           // We are running on http://localhost:8000, we can use libarchive.js!
           try {
-            const { Archive } = await import('./libarchive.js');
+            const { Archive } = await import('./js/libarchive.js');
             Archive.init({
               workerUrl: './js/worker-bundle.js'
             });
